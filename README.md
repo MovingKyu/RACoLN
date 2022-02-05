@@ -56,8 +56,7 @@ The result should be similar to the ones reported in the paper. With minor chang
 
 |                 | Style Acc | Self-BLEU | Ref-BLEU | PPL   |
 |-----------------|-----------|-----------|----------|-------|
-| This Repository | 90.9      | 58.73     | 20.67    | 47.18 |
-| Reported        | 91.3      | 59.4      | 20.0     | 60.1  |
+| RACoLN | 90.9      | 58.73     | 20.67    | 47.18 |
 
 # Reference
 ```
