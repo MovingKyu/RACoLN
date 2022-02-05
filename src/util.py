@@ -203,7 +203,7 @@ def getLossAndMetrics(iter,G, dec, nll, enc_r, attn_r, senti_r, BCE, mse, config
     bleu_scores = bleu_scores/iter_len*100
     loss = self_loss_list/iter_len + config.styleLossCoef*style_loss_list/iter_len + mse_loss_list/iter_len + cycle_loss_list/iter_len
     if save:
-        with open('logs/{}.jsonl'.format(config.name), 'w') as fp:
+        with open('output/{}.jsonl'.format(config.name), 'w') as fp:
             for i, line in enumerate(zip(sentences, labels)):
                 data_json={}
                 data_json["index"] = i
