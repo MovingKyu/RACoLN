@@ -4,6 +4,10 @@ import torch
 from src.model import *
 import math
 import json
+from nltk.translate.bleu_score import sentence_bleu
+from nltk.translate.bleu_score import SmoothingFunction
+
+bleu_weight = (0.25, 0.25, 0.25, 0.25)
 
 def load_batch_iterator_with_eos(path, train, val, test, batch_size, device):
     split_tokenizer = lambda x: x.split()
@@ -158,9 +162,8 @@ def computeOtherLoss(batch, G, dec, enc_r, attn_r, senti_r, hidden_self, BCE, ms
         loss_r = loss_r.sum()/batch.C.size(0)
         mseLoss = mseLoss.sum()/(batch.C.size(0)*mseLoss.size(1))
     return loss_r, mseLoss, cycle_loss
-from nltk.translate.bleu_score import sentence_bleu
-from nltk.translate.bleu_score import SmoothingFunction
-def getLossAndMetrics(iter,G, dec, nll, enc_r, attn_r, senti_r, BCE, mse, config, pad_idx, enc_cls, attn_cls, senti_cls, model, weights, iter_len, X_VOCAB, save=False):
+
+def getLossAndMetrics(iter,G, dec, nll, enc_r, attn_r, senti_r, BCE, mse, config, pad_idx, enc_cls, attn_cls, senti_cls, iter_len, X_VOCAB, C_LABEL, save=False):
     acc, total, bleu_scores = 0, 0, 0
     sentences=[]
     labels = []
@@ -193,10 +196,10 @@ def getLossAndMetrics(iter,G, dec, nll, enc_r, attn_r, senti_r, BCE, mse, config
             sentences.append(pred)
             ref = [pred.split()]
             candi = tensor_to_str(real[:int(real_len.item()-1)],X_VOCAB).lower().split()
-            score = sentence_bleu(ref, candi, weights, smoothing_function=SmoothingFunction().method1)
+            score = sentence_bleu(ref, candi, bleu_weight, smoothing_function=SmoothingFunction().method1)
             bleu_scores+=score
     accuracy = round(acc/total, 3)
-    ppl = evalPPL_yelp(model, sentences)
+    # ppl = evalPPL_yelp(model, sentences)
     bleu_scores = bleu_scores/iter_len*100
     loss = self_loss_list/iter_len + config.styleLossCoef*style_loss_list/iter_len + mse_loss_list/iter_len + cycle_loss_list/iter_len
     if save:
@@ -205,10 +208,10 @@ def getLossAndMetrics(iter,G, dec, nll, enc_r, attn_r, senti_r, BCE, mse, config
                 data_json={}
                 data_json["index"] = i
                 data_json["X"] = line[0].replace("\n","")
-                data_json["C"] = line[1]
+                data_json["C"] = C_LABEL.vocab.itos[line[1]]
                 json.dump(data_json, fp)
                 fp.write("\n")
-    return loss, accuracy, ppl, bleu_scores
+    return loss, accuracy, bleu_scores
 
 def getLogger(LoggerName):
     import logging

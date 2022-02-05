@@ -1,5 +1,5 @@
 kenlm/
 Ignore/
 nohup.out
-model/
+model/*
 yelp.binary
