@@ -2,4 +2,5 @@ kenlm/
 Ignore/
 nohup.out
 model/*
+!model/.gitkeep
 yelp.binary
