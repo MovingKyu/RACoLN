@@ -50,8 +50,8 @@ bos_idx = X_VOCAB.vocab.stoi["<bos>"]
 eos_idx = X_VOCAB.vocab.stoi["<eos>"]
 lm = GRU_LM(len(X_VOCAB.vocab), config.embedding_size, config.hidden_size, pad_idx, dropout = 0.4).to(config.device)
 lm_optim = torch.optim.Adam(lm.parameters(), config.lr)
-ce = torch.nn.CrossEntropyLoss()
-ce_val = torch.nn.CrossEntropyLoss(reduction="none")
+ce = torch.nn.CrossEntropyLoss(ignore_index=pad_idx)
+ce_val = torch.nn.CrossEntropyLoss(reduction="none", ignore_index=pad_idx)
 
 min_ppl = float("inf")
 for epoch in range(config.max_epoch):
@@ -68,13 +68,15 @@ for epoch in range(config.max_epoch):
             logger.info("Train Epoch {}-{} PPL : {}".format(epoch, i, loss.exp().item()))
     lm.eval()
     ppl = []
+    length=0
     for i, batch in enumerate(dev_iter):
         lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
         logit = lm(lm_text.T, batch.X[1])
         logit = logit.view(-1, logit.size(2))
         target = torch.reshape(batch.X[0].T, (-1,))
         ppl.extend(ce_val(logit, target).tolist())
-    val_loss = sum(ppl)/len(ppl)
+        length+=batch.X[1].sum()
+    val_loss = sum(ppl)/length
     val_ppl = math.exp(val_loss)
     logger.info("Validation Epoch {} PPL : {}".format(epoch, val_ppl))
     if val_ppl<min_ppl:

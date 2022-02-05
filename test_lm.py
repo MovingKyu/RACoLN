@@ -54,92 +54,20 @@ lm = GRU_LM(len(X_VOCAB.vocab), config.embedding_size, config.hidden_size, pad_i
 lm.load_state_dict(torch.load("model/{}_lm.pth".format(config.data)))
 
 
+output_iter = fetchIter("output/reverseAttention.jsonl", X_VOCAB, C_LABEL, config.batch_size, config.device)
 
-split_tokenizer = lambda x: x.split()
-ours= TabularDataset(path="./data/yelp/reverseAttention.jsonl",
-                  format="json",
-                  fields={"X":("X", X_VOCAB),
-                          "C": ('C', C_LABEL)})
+ref_iter = fetchIter(f"data/{config.data}/sentiment.ref.jsonl",X_VOCAB, C_LABEL, config.batch_size, config.device)
 
-ours_iter = BucketIterator(ours, batch_size=config.batch_size,sort_key=lambda x: len(x.X), device=config.device, shuffle=False)
-refs= TabularDataset(path="./data/yelp/sentiment.ref.jsonl",
-                  format="json",
-                  fields={"X":("X", X_VOCAB),
-                          "C": ('C', C_LABEL)})
+test_iter = fetchIter(f"data/{config.data}/test.jsonl",X_VOCAB, C_LABEL, config.batch_size, config.device)
 
-ref_iter = BucketIterator(refs, batch_size=config.batch_size,sort_key=lambda x: len(x.X), device=config.device, shuffle=False)
-ce_val = torch.nn.CrossEntropyLoss(reduction="none")
+ce_val = torch.nn.CrossEntropyLoss(reduction="none", ignore_index=pad_idx)
 lm.eval()
 
-ppl = []
-for i, batch in enumerate(ref_iter):
-    lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
-    logit = lm(lm_text.T, batch.X[1])
-    logit = logit.view(-1, logit.size(2))
-    target = torch.reshape(batch.X[0].T, (-1,))
-    ppl.extend(ce_val(logit, target).tolist())
-val_loss = sum(ppl)/len(ppl)
-val_ppl = math.exp(val_loss)
-logger.info("[{}] PPL : {}".format("Ref", val_ppl))
+ppl = computePPL(test_iter, lm, ce_val, bos_idx, pad_idx, eos_idx)
+logger.info("[{}] PPL : {}".format("Test", ppl))
 
-ppl = []
-for i, batch in enumerate(ours_iter):
-    lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
-    logit = lm(lm_text.T, batch.X[1])
-    logit = logit.view(-1, logit.size(2))
-    target = torch.reshape(batch.X[0].T, (-1,))
-    ppl.extend(ce_val(logit, target).tolist())
-val_loss = sum(ppl)/len(ppl)
-val_ppl = math.exp(val_loss)
-logger.info("[{}] PPL : {}".format("Ours", val_ppl))
+ppl = computePPL(ref_iter, lm, ce_val, bos_idx, pad_idx, eos_idx)
+logger.info("[{}] PPL : {}".format("Ref", ppl))
 
-sttf= TabularDataset(path="./data/yelp/styleTransformer.jsonl",
-                  format="json",
-                  fields={"X":("X", X_VOCAB),
-                          "C": ('C', C_LABEL)})
-
-sttf_iter = BucketIterator(sttf, batch_size=config.batch_size,sort_key=lambda x: len(x.X), device=config.device, shuffle=False)
-ppl = []
-for i, batch in enumerate(sttf_iter):
-    lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
-    logit = lm(lm_text.T, batch.X[1])
-    logit = logit.view(-1, logit.size(2))
-    target = torch.reshape(batch.X[0].T, (-1,))
-    ppl.extend(ce_val(logit, target).tolist())
-val_loss = sum(ppl)/len(ppl)
-val_ppl = math.exp(val_loss)
-logger.info("[{}] PPL : {}".format("StyleTransformer", val_ppl))
-
-sttf= TabularDataset(path="./data/yelp/controlGen.jsonl",
-                  format="json",
-                  fields={"X":("X", X_VOCAB),
-                          "C": ('C', C_LABEL)})
-
-sttf_iter = BucketIterator(sttf, batch_size=config.batch_size,sort_key=lambda x: len(x.X), device=config.device, shuffle=False)
-ppl = []
-for i, batch in enumerate(sttf_iter):
-    lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
-    logit = lm(lm_text.T, batch.X[1])
-    logit = logit.view(-1, logit.size(2))
-    target = torch.reshape(batch.X[0].T, (-1,))
-    ppl.extend(ce_val(logit, target).tolist())
-val_loss = sum(ppl)/len(ppl)
-val_ppl = math.exp(val_loss)
-logger.info("[{}] PPL : {}".format("ControlGen", val_ppl))
-
-sttf= TabularDataset(path="logs/yelp-0.15.jsonl",
-                  format="json",
-                  fields={"X":("X", X_VOCAB),
-                          "C": ('C', C_LABEL)})
-
-sttf_iter = BucketIterator(sttf, batch_size=config.batch_size,sort_key=lambda x: len(x.X), device=config.device, shuffle=False)
-ppl = []
-for i, batch in enumerate(sttf_iter):
-    lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
-    logit = lm(lm_text.T, batch.X[1])
-    logit = logit.view(-1, logit.size(2))
-    target = torch.reshape(batch.X[0].T, (-1,))
-    ppl.extend(ce_val(logit, target).tolist())
-val_loss = sum(ppl)/len(ppl)
-val_ppl = math.exp(val_loss)
-logger.info("[{}] PPL : {}".format("Reproduce Ours", val_ppl))
+ppl = computePPL(output_iter, lm, ce_val, bos_idx, pad_idx, eos_idx)
+logger.info("[{}] PPL : {}".format("Output", ppl))

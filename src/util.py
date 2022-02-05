@@ -225,3 +225,25 @@ def getLogger(LoggerName):
     )
     logger = logging.getLogger(LoggerName)
     return logger
+
+def computePPL(iter, lm, criterion, bos_idx, pad_idx, eos_idx):
+    ppl = []
+    length = 0
+    for i, batch in enumerate(iter):
+        lm_text = prepareBatchForLM(batch.X[0], bos_idx, pad_idx, eos_idx)
+        logit = lm(lm_text.T, batch.X[1])
+        logit = logit.view(-1, logit.size(2))
+        target = torch.reshape(batch.X[0].T, (-1,))
+        ppl.extend(criterion(logit, target).tolist())
+        length += batch.X[1].sum()
+    loss = sum(ppl)/length
+    ppl = math.exp(loss)
+    return ppl 
+
+def fetchIter(path, X_VOCAB, C_LABEL, batch_size, device):
+    dataset= TabularDataset(path=path,
+                    format="json",
+                    fields={"X":("X", X_VOCAB),
+                            "C": ('C', C_LABEL)})
+    iter = BucketIterator(dataset, batch_size=batch_size,sort_key=lambda x: len(x.X), device=device, shuffle=False)
+    return iter
