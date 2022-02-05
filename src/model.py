@@ -84,6 +84,52 @@ class SentimentClassifier(nn.Module):
         return self.linear(attn_output).squeeze()
 
 
+
+class Generator(nn.Module):
+    def __init__(self, enc_cls, mlp, enc):
+        super(Generator, self).__init__()
+        self.enc_cls = enc_cls
+        self.mlp = mlp
+        self.enc = enc
+        self.mlp.dropout.p=0.2
+        self.enc_cls.dropout.p=0.2
+        self.z_dim = 500
+        self.y_dim = 200
+
+    def forward(self, X):
+        output, hidden = self.enc_cls(X)
+        scores, attn_hidden, reverse_scores, src_mask = self.mlp(output, X[1], temp=0.4)
+        scores = scores.detach()
+        reverse_scores = reverse_scores.detach()
+        output, hidden = self.enc(X, scores, reverse_scores)
+#         content = hidden[:,self.y_dim:]
+#         style = hidden[:,:self.y_dim]
+        return hidden, output, hidden, src_mask, reverse_scores
+
+# language model for ppl
+class GRU_LM(nn.Module):
+    def __init__(self, vocab_size, embedding_size, hidden_size, padding_idx, dropout = 0.4):
+        super(GRU_LM, self).__init__()
+        self.hidden_size = hidden_size
+        self.emb= nn.Embedding(vocab_size, embedding_size, padding_idx=padding_idx)
+        self.gru = nn.GRU(embedding_size, hidden_size, batch_first=True, bidirectional=False)
+        self.dropout = nn.Dropout(dropout)
+        self.out = nn.Linear(self.hidden_size, vocab_size)
+
+    def forward(self, text, length):
+        x = self.emb(text)
+        x = self.dropout(x)
+        x = torch.nn.utils.rnn.pack_padded_sequence(x, length.cpu(), batch_first=True, enforce_sorted=False)
+        output, _ = self.gru(x)
+        output, _ = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
+        output = self.dropout(output)
+        return self.out(output)
+
+#########################################################################
+
+# Decoder is a modification of "https://github.com/IBM/pytorch-seq2seq"
+
+#########################################################################
 class BaseRNN(nn.Module):
     SYM_MASK = "MASK"
     SYM_EOS = "EOS"
@@ -107,67 +153,6 @@ class BaseRNN(nn.Module):
 
     def forward(self, *args, **kwargs):
         raise NotImplementedError()
-
-class Attention(nn.Module):
-    def __init__(self, output_hidden_dim, hidden_dim):
-        super(Attention, self).__init__()
-        self.linear_out = nn.Linear(hidden_dim*2, output_hidden_dim)
-        self.mask = None
-        self.linear = nn.Linear(output_hidden_dim, hidden_dim)
-
-    def set_mask(self, mask):
-        """
-        Sets indices to be masked
-        Args:
-            mask (torch.Tensor): tensor containing indices to be masked
-        """
-        self.mask = mask
-
-    def forward(self, output, context, mask):
-        batch_size = output.size(0)
-        hidden_size = output.size(2)
-        input_size = context.size(0)
-        #output = self.linear(output)
-        self.set_mask(mask)
-        
-        # (batch, out_len, dim) * (batch, in_len, dim) -> (batch, out_len, in_len)
-        output = self.linear(output)
-        attn = torch.bmm(output, context.permute(1, 2, 0))
-        if self.mask is not None:
-            attn.data.masked_fill_(self.mask.unsqueeze(1), -float('inf'))
-        attn = F.softmax(attn.view(-1, input_size), dim=1).view(batch_size, -1, input_size)
-
-        # (batch, out_len, in_len) * (batch, in_len, dim) -> (batch, out_len, dim)
-        mix = torch.bmm(attn, context.permute(1, 0, 2))
-
-        # concat -> (batch, out_len, 2*dim)
-        combined = torch.cat((mix, output), dim=2)
-        # output -> (batch, out_len, dim)
-        output = torch.tanh(self.linear_out(combined)).view(batch_size, -1, hidden_size)
-
-        return output, attn
-
-class Generator(nn.Module):
-    def __init__(self, enc_cls, mlp, enc):
-        super(Generator, self).__init__()
-        self.enc_cls = enc_cls
-        self.mlp = mlp
-        self.enc = enc
-        self.mlp.dropout.p=0.2
-        self.enc_cls.dropout.p=0.2
-        self.z_dim = 500
-        self.y_dim = 200
-
-    def forward(self, X):
-        output, hidden = self.enc_cls(X)
-        scores, attn_hidden, reverse_scores, src_mask = self.mlp(output, X[1], temp=0.4)
-        scores = scores.detach()
-        reverse_scores = reverse_scores.detach()
-        output, hidden = self.enc(X, scores, reverse_scores)
-#         content = hidden[:,self.y_dim:]
-#         style = hidden[:,:self.y_dim]
-        return hidden, output, hidden, src_mask, reverse_scores
-
 class DecoderRNN_LN(BaseRNN):
     KEY_ATTN_SCORE = 'attention_score'
     KEY_LENGTH = 'length'
@@ -309,21 +294,41 @@ class DecoderRNN_LN(BaseRNN):
 
         return inputs, batch_size, max_length
 
-# language model for ppl
-class GRU_LM(nn.Module):
-    def __init__(self, vocab_size, embedding_size, hidden_size, padding_idx, dropout = 0.4):
-        super(GRU_LM, self).__init__()
-        self.hidden_size = hidden_size
-        self.emb= nn.Embedding(vocab_size, embedding_size, padding_idx=padding_idx)
-        self.gru = nn.GRU(embedding_size, hidden_size, batch_first=True, bidirectional=False)
-        self.dropout = nn.Dropout(dropout)
-        self.out = nn.Linear(self.hidden_size, vocab_size)
+class Attention(nn.Module):
+    def __init__(self, output_hidden_dim, hidden_dim):
+        super(Attention, self).__init__()
+        self.linear_out = nn.Linear(hidden_dim*2, output_hidden_dim)
+        self.mask = None
+        self.linear = nn.Linear(output_hidden_dim, hidden_dim)
 
-    def forward(self, text, length):
-        x = self.emb(text)
-        x = self.dropout(x)
-        x = torch.nn.utils.rnn.pack_padded_sequence(x, length.cpu(), batch_first=True, enforce_sorted=False)
-        output, _ = self.gru(x)
-        output, _ = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
-        output = self.dropout(output)
-        return self.out(output)
+    def set_mask(self, mask):
+        """
+        Sets indices to be masked
+        Args:
+            mask (torch.Tensor): tensor containing indices to be masked
+        """
+        self.mask = mask
+
+    def forward(self, output, context, mask):
+        batch_size = output.size(0)
+        hidden_size = output.size(2)
+        input_size = context.size(0)
+        #output = self.linear(output)
+        self.set_mask(mask)
+        
+        # (batch, out_len, dim) * (batch, in_len, dim) -> (batch, out_len, in_len)
+        output = self.linear(output)
+        attn = torch.bmm(output, context.permute(1, 2, 0))
+        if self.mask is not None:
+            attn.data.masked_fill_(self.mask.unsqueeze(1), -float('inf'))
+        attn = F.softmax(attn.view(-1, input_size), dim=1).view(batch_size, -1, input_size)
+
+        # (batch, out_len, in_len) * (batch, in_len, dim) -> (batch, out_len, dim)
+        mix = torch.bmm(attn, context.permute(1, 0, 2))
+
+        # concat -> (batch, out_len, 2*dim)
+        combined = torch.cat((mix, output), dim=2)
+        # output -> (batch, out_len, dim)
+        output = torch.tanh(self.linear_out(combined)).view(batch_size, -1, hidden_size)
+
+        return output, attn
