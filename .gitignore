@@ -7,3 +7,4 @@ yelp.binary
 output/
 !output/yelp_racoln.jsonl
 logs/
+.vscode/
