@@ -9,10 +9,13 @@ This repository is the official pytorch implementation of the [paper](https://ac
 - torchtext == 0.10.0
 - pkbar == 0.5
 
+# Dataset
+Our implementation used torchtext, hence we have changed the input format to jsonl. If you want to try the model on other dataset, please change the input format accordingly (you can check at data directory)
+
 # Training classifiers
 In this work, we train three classifiers: 1) for reverse attention, 2) for style loss, and 3) for evaluation purpose. The classifier is made of GRU and Attention network.
 
-The configuration is defined as the default option in the file. If you would like to try different value, check the argparse options. 
+The configuration is defined as the default option in the file. If you would like to try a different value, check the argparse options. 
 
 ```
 python train_cls.py
@@ -26,7 +29,7 @@ python test_cls.py
 The accuracy should be between 97.5 and 98.0 for Yelp dataset.
 
 # Training language model
-Different from the original paper, where we have used KenLM, this repository trains a GRU-based langauge model as it is 1) easier to train and 2) no need to install kenLM. (Although we use GRU-based LM, we have checked that the output will have similar PPL score with KenLM).
+Different from the original paper, where we have used KenLM, this repository trains a GRU-based langauge model as we can skip installing kenLM. (Although we use GRU-based LM, we have checked that the output will have similar PPL score with KenLM).
 
 To train the langauge model for evaluation purpose, computing Perplexity, run the following:
 
