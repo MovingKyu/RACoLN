@@ -1,17 +1,12 @@
-import pkbar
-import math
 import torch
 from src.model import *
 from src.util import *
-from nltk.translate.bleu_score import sentence_bleu
-from nltk.translate.bleu_score import SmoothingFunction
 from torchtext.legacy.data import TabularDataset, BucketIterator
-import kenlm
-import math
 import numpy as np
 import logging
 import os
 import sys, argparse
+
 logging.basicConfig(
 format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 datefmt="%Y-%m-%d %H:%M:%S",
@@ -101,7 +96,6 @@ test_ = TabularDataset(path="./data/yelp/sentiment.ref.jsonl",
 
 test_iter_ = BucketIterator(test_, batch_size=config.batch_size,sort_key=lambda x: len(x.X), device=config.device, shuffle=False)
 test_acc_sum = 0.0
-model = kenlm.LanguageModel('yelp.binary')
 
 
 G.train()
