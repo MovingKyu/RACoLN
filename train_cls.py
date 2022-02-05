@@ -10,7 +10,7 @@ from src import util
 from src.model import *
 
 class StyleClsConfig:
-    def __init__(self, data = "yelp", min_freq=4, batch_size=512, device="cuda", embedding_size = 128, hidden_size = 500, attn_size = 100, max_epoch = 18, seed = 0000, lr = 0.0005, eval_iter=500, max_iter=20000):
+    def __init__(self, data = "yelp", min_freq=4, batch_size=512, device="cuda", embedding_size = 128, hidden_size = 500, attn_size = 100, max_epoch = 18, seed = 0000, lr = 0.0005, eval_iter=500):
         self.data = data
         self.data_path = f"data/{data}/"
         self.min_freq = min_freq
@@ -22,10 +22,7 @@ class StyleClsConfig:
         self.max_epoch = max_epoch
         self.seed = seed
         self.lr = lr
-        self.pos_idx = 0
-        self.neg_idx = 1
         self.eval_iter = eval_iter
-        self.max_iter = max_iter
 
 config = StyleClsConfig()
 train, dev, test, train_iter, dev_iter, test_iter, X_VOCAB, C_LABEL = util.load_batch_iterator_with_eos(config.data_path, train="train.jsonl", val="dev.jsonl", test = "test.jsonl",
@@ -58,7 +55,7 @@ models = [enc_r, attn_r, senti_r, enc_cls, attn_cls, senti_cls, enc_eval, attn_e
 
 ce = torch.nn.CrossEntropyLoss()
 
-num_epoch = 10
+num_epoch = config.max_epoch
 enc_cls.train()
 attn_cls.train()
 senti_cls.train()

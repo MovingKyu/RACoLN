@@ -17,26 +17,29 @@ level=os.environ.get("LOGLEVEL", "INFO").upper(),
 stream=sys.stdout,
 )
 logger = logging.getLogger("train_lm.py")
+import argparse
 
-class LmConfig:
-    def __init__(self, data = "yelp", min_freq=4, batch_size=512, device="cuda", embedding_size = 128, hidden_size = 500, attn_size = 100, max_epoch = 20, seed = 0000, lr = 0.0005, eval_iter=100, max_iter=20000):
-        self.data = data
-        self.data_path = f"data/{data}/"
-        self.min_freq = min_freq
-        self.batch_size = batch_size
-        self.device = device
-        self.embedding_size = embedding_size
-        self.hidden_size = hidden_size
-        self.attn_size = attn_size 
-        self.max_epoch = max_epoch
-        self.seed = seed
-        self.lr = lr
-        self.pos_idx = 0
-        self.neg_idx = 1
-        self.log_iter = eval_iter
-        self.max_iter = max_iter
+parser = argparse.ArgumentParser(description='Argparse Tutorial')
+parser.add_argument('--embedding-size', type=int, default=128,
+                    help='yelp set to 128')
+parser.add_argument('--hidden-size', type=int, default=500,
+                    help='hidden size set to 500')
+parser.add_argument('--batch-size', type=int, default=512,
+                    help='batch size set to 512 for yelp')
+parser.add_argument('--attn-size', type=int, default=100,
+                    help='attn size set to 100 for yelp')
+parser.add_argument('--path-to-output', type=str, default="output/yelp_racoln.jsonl",
+                    help='jsonl path')
+parser.add_argument('--data', type=str, default="yelp",
+                    help='data')
+config = parser.parse_args()
 
-config = LmConfig()
+if torch.cuda.is_available():
+    config.device = "cuda"
+else:
+    config.device = "cpu"
+config.data_path = f"data/{config.data}"
+
 train, dev, test, train_iter, dev_iter, test_iter, X_VOCAB, C_LABEL = load_batch_iterator_with_eos(config.data_path, train="train.jsonl", val="dev.jsonl", test = "test.jsonl",
                         batch_size=config.batch_size,device=config.device)
 
@@ -51,7 +54,7 @@ enc_eval, attn_eval, senti_eval= get_classifier(len(X_VOCAB.vocab), config.embed
 
 
 # Fetch Iter
-output_iter = fetchIter("output/yelp-0.15_.jsonl", X_VOCAB, C_LABEL, config.batch_size, config.device)
+output_iter = fetchIter(config.path_to_output, X_VOCAB, C_LABEL, config.batch_size, config.device)
 
 ref_iter = fetchIter(f"data/{config.data}/sentiment.ref.jsonl",X_VOCAB, C_LABEL, config.batch_size, config.device)
 test_iter = fetchIter(f"data/{config.data}/test.jsonl",X_VOCAB, C_LABEL, config.batch_size, config.device)
