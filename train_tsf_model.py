@@ -6,6 +6,7 @@ import numpy as np
 import logging
 import os
 import sys, argparse
+import random
 
 logging.basicConfig(
 format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -132,6 +133,7 @@ for epoch in range(config.max_epoch):
             loss, accuracy, bleu_scores= getLossAndMetrics(dev_iter,G, dec, nll, enc_r, attn_r, senti_r, BCE, mse, config, pad_idx, enc_cls, attn_cls, senti_cls, len(dev), X_VOCAB, C_LABEL)
 
             # If works great on Dev, then run on Test
+            # Dev is only used to compute generalization error! 
             if loss<minLoss:
                 minLoss = loss
                 torch.save(G.state_dict(), "model/{}_G.pth".format(config.data))
