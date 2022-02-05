@@ -101,14 +101,6 @@ def get_classifier(input_size, embedding_dim, attention_dim, hidden_dim, pad_idx
     senti.load_state_dict(torch.load(f"model/{data}_senti_{model_name}.pth"))
     return enc, attn, senti
 
-def evalPPL_yelp(model, sentences):
-    sum_ = 0
-    length=0
-    for sentence in sentences:
-        sum_ += -1 * sum(score for score, _, _ in model.full_scores(sentence))
-        length += len(list(model.full_scores(sentence)))
-    return math.pow(10, sum_/length)
-
 def prepareBatchForLM(text, bos_idx, pad_idx, eos_idx):
     text[text==eos_idx] = pad_idx
     bos = torch.full((1, text.size(1)),bos_idx).to(text.device)
