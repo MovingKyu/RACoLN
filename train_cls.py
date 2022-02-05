@@ -1,30 +1,45 @@
 import pkbar
 import math
-from torch import nn, optim
 import torch
-import numpy as np
-import torch.nn.functional as F
-
-
+import argparse
 from src import util
 from src.model import *
+import numpy as np
+import random
 
-class StyleClsConfig:
-    def __init__(self, data = "yelp", min_freq=4, batch_size=512, device="cuda", embedding_size = 128, hidden_size = 500, attn_size = 100, max_epoch = 18, seed = 0000, lr = 0.0005, eval_iter=500):
-        self.data = data
-        self.data_path = f"data/{data}/"
-        self.min_freq = min_freq
-        self.batch_size = batch_size
-        self.device = device
-        self.embedding_size = embedding_size
-        self.hidden_size = hidden_size
-        self.attn_size = attn_size 
-        self.max_epoch = max_epoch
-        self.seed = seed
-        self.lr = lr
-        self.eval_iter = eval_iter
+parser = argparse.ArgumentParser(description='Argparse Tutorial')
+parser.add_argument('--embedding-size', type=int, default=128,
+                    help='yelp set to 128')
+parser.add_argument('--hidden-size', type=int, default=500,
+                    help='hidden size set to 500')
+parser.add_argument('--batch-size', type=int, default=512,
+                    help='batch size set to 512 for yelp')
+parser.add_argument('--attn-size', type=int, default=100,
+                    help='attn size set to 512 for yelp')
+parser.add_argument('--data', type=str, default="yelp",
+                    help='data')
+parser.add_argument('--lr', type=float, default=0.0005,
+                    help='learning rate')
+parser.add_argument('--seed', type=int, default=0000,
+                    help='random seed')
+parser.add_argument('--max-epoch', type=int, default=20,
+                    help='max epoch')
+parser.add_argument('--log_iter', type=int, default=100,
+                    help='log iteration')
+parser.add_argument('--eval_iter', type=int, default=500,
+                    help='log iteration')
+config = parser.parse_args()
 
-config = StyleClsConfig()
+if torch.cuda.is_available():
+    config.device = "cuda"
+else:
+    config.device = "cpu"
+config.data_path = f"data/{config.data}"
+
+torch.manual_seed(config.seed)
+np.random.seed(config.seed)
+random.seed(config.seed)
+
 train, dev, test, train_iter, dev_iter, test_iter, X_VOCAB, C_LABEL = util.load_batch_iterator_with_eos(config.data_path, train="train.jsonl", val="dev.jsonl", test = "test.jsonl",
                         batch_size=config.batch_size,device=config.device)
 
@@ -36,18 +51,18 @@ pad_idx = X_VOCAB.vocab.stoi["<pad>"]
 
 # Train Three Classifier (1 for reverse attention, 1 for classification loss, and 1 for evaluation purpose)
 
-enc_cls = EncoderRNN(input_size, embedding_dim, hidden_dim, pad_idx, cls=True).to(config.device)
-attn_cls = MLPAttention(hidden_dim, 100).to(config.device)
+enc_cls = EncoderRNN(input_size, embedding_dim, hidden_dim, pad_idx).to(config.device)
+attn_cls = MLPAttention(hidden_dim, config.attn_size).to(config.device)
 senti_cls = SentimentClassifier(hidden_dim).to(config.device)
 cls_optim = torch.optim.Adam(list(enc_cls.parameters())+list(attn_cls.parameters())+list(senti_cls.parameters()))
 
-enc_r = EncoderRNN(input_size, embedding_dim, hidden_dim, pad_idx, cls=True).to(config.device)
-attn_r = MLPAttention(hidden_dim, 100).to(config.device)
+enc_r = EncoderRNN(input_size, embedding_dim, hidden_dim, pad_idx).to(config.device)
+attn_r = MLPAttention(hidden_dim, config.attn_size).to(config.device)
 senti_r = SentimentClassifier(hidden_dim).to(config.device)
 r_optim = torch.optim.Adam(list(attn_r.parameters())+list(enc_r.parameters())+list(senti_r.parameters()))
 
-enc_eval = EncoderRNN(input_size, embedding_dim, hidden_dim, pad_idx, cls=True).to(config.device)
-attn_eval = MLPAttention(hidden_dim, 100).to(config.device)
+enc_eval = EncoderRNN(input_size, embedding_dim, hidden_dim, pad_idx).to(config.device)
+attn_eval = MLPAttention(hidden_dim, config.attn_size).to(config.device)
 senti_eval = SentimentClassifier(hidden_dim).to(config.device)
 eval_optim = torch.optim.Adam(list(enc_eval.parameters())+list(attn_eval.parameters())+list(senti_eval.parameters()))
 
@@ -95,7 +110,7 @@ for epoch in range(num_epoch):
         eval_optim.step()
 
         kbar.update(i, values=[("loss(R)", loss_r.item()), ("loss(C)", loss_cls.item()), ("loss(E)", loss_eval.item())])
-        if i%config.eval_iter==0:
+        if i%config.eval_iter==0 and epoch != 0:
             for model in models:
                 model.eval()
             acc1 = 0

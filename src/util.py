@@ -1,4 +1,3 @@
-from itertools import cycle
 from torchtext.legacy.data import TabularDataset, BucketIterator, Iterator,Field, LabelField
 import torch
 from src.model import *

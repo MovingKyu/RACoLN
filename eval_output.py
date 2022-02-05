@@ -1,25 +1,19 @@
-import pkbar
-import math
-from torch import nn, optim
 import torch
-import numpy as np
-import torch.nn.functional as F
-import math
 from src.util import *
 from src.model import *
 import logging
 import os
 import sys
+import argparse
 logging.basicConfig(
 format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 datefmt="%Y-%m-%d %H:%M:%S",
 level=os.environ.get("LOGLEVEL", "INFO").upper(),
 stream=sys.stdout,
 )
-logger = logging.getLogger("train_lm.py")
-import argparse
+logger = logging.getLogger("eval_output.py")
 
-parser = argparse.ArgumentParser(description='Argparse Tutorial')
+parser = argparse.ArgumentParser(description='Argparse for Evaluation and Loading necessary models')
 parser.add_argument('--embedding-size', type=int, default=128,
                     help='yelp set to 128')
 parser.add_argument('--hidden-size', type=int, default=500,
@@ -60,6 +54,8 @@ ref_iter = fetchIter(f"data/{config.data}/sentiment.ref.jsonl",X_VOCAB, C_LABEL,
 test_iter = fetchIter(f"data/{config.data}/test.jsonl",X_VOCAB, C_LABEL, config.batch_size, config.device)
 
 ce_val = torch.nn.CrossEntropyLoss(reduction="none", ignore_index=pad_idx)
+
+# Eval Mode
 lm.eval()
 enc_eval.eval()
 attn_eval.eval()
@@ -80,10 +76,10 @@ for batch_output, batch_ref, batch_test in zip(output_iter, ref_iter, test_iter)
         pred = tensor_to_str(text[:int(text_length.item()-1)],X_VOCAB).lower()
         ref = [pred.split()]
         candi = tensor_to_str(test_text[:int(test_len.item()-1)],X_VOCAB).lower().split()
-        score = sentence_bleu(ref, candi, (0.25, 0.25, 0.25, 0.25), smoothing_function=SmoothingFunction().method1)
+        score = sentence_bleu(ref, candi, bleu_weight, smoothing_function=SmoothingFunction().method1)
         selfBLEU+=score
         candi = tensor_to_str(ref_text[:int(ref_len.item()-1)],X_VOCAB).lower().split()
-        score = sentence_bleu(ref, candi, (0.25, 0.25, 0.25, 0.25), smoothing_function=SmoothingFunction().method1)
+        score = sentence_bleu(ref, candi, bleu_weight, smoothing_function=SmoothingFunction().method1)
         refBLEU+=score
 
 logger.info("[{}] Self-BLEU : {}".format("Output", selfBLEU/len(test)*100))
