@@ -63,6 +63,7 @@ def runClassifier(batch, enc, attn, cls):
     _, attn_hidden, _, _= attn(output, batch.X[1])
     logits = cls(attn_hidden)
     return logits
+
 def computeAccuracy(logits, label):
     _, pred = logits.max(dim=-1)
     return (pred==label).sum().item()
@@ -79,12 +80,6 @@ def get_length(tokens, eos_idx):
     lengths[index] = tokens.size(0)
     return lengths.detach()
 
-class my_batch:
-    def __init__(self, batch, which_style):
-        self.C = batch.C[batch.C==which_style]
-        if len(self.C) !=0:
-            self.max_len = int(batch.X[1][batch.C==which_style].max())
-            self.X = (batch.X[0][:,batch.C==which_style][:self.max_len,:], batch.X[1][batch.C==which_style])
 def get_mask(length, text):
     max_len = text.size(0)
     #max_len = max(length).item()
@@ -110,12 +105,14 @@ def evalPPL_yelp(model, sentences):
         sum_ += -1 * sum(score for score, _, _ in model.full_scores(sentence))
         length += len(list(model.full_scores(sentence)))
     return math.pow(10, sum_/length)
+
 def prepareBatchForLM(text, bos_idx, pad_idx, eos_idx):
     text[text==eos_idx] = pad_idx
     bos = torch.full((1, text.size(1)),bos_idx).to(text.device)
     text = text[:-1,:]
     text = torch.cat([bos, text], dim=0)
     return text
+
 def processOutput(dictionary, pad_idx, device):
     length = torch.Tensor(dictionary["length"]).to(device)
     soft_text =(torch.stack(dictionary["sequence"]).squeeze(), length)
@@ -247,3 +244,10 @@ def fetchIter(path, X_VOCAB, C_LABEL, batch_size, device):
                             "C": ('C', C_LABEL)})
     iter = BucketIterator(dataset, batch_size=batch_size,sort_key=lambda x: len(x.X), device=device, shuffle=False)
     return iter
+
+def getSpecialTokens(X_VOCAB):
+    pad_idx = X_VOCAB.vocab.stoi["<pad>"]
+    bos_idx = X_VOCAB.vocab.stoi["<bos>"]
+    eos_idx = X_VOCAB.vocab.stoi["<eos>"]
+    return bos_idx, pad_idx, eos_idx
+    
